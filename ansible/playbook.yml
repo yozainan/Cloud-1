@@ -1,0 +1,25 @@
+---
+- name: Deploy Cloud-1 Infrastructure
+  hosts: webservers
+  become: true
+
+  roles:
+    # setup role for initial server configuration
+    - role: setup
+      tags: setup
+
+    # containerized application roles
+    - role: mariadb
+      tags: mariadb
+    - role: redis
+      tags: redis
+    - role: adminer
+      tags: adminer
+    - role: wordpress
+      tags: wordpress
+    - role: nginx
+      tags: nginx
+
+    # certificate management role
+    - role: certificates
+      tags: certificates

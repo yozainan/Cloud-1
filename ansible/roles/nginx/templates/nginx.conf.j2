@@ -1,0 +1,53 @@
+server {
+    listen 80;
+    server_name {{ domain_name }};
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+{% if cert_exists | bool %}
+    location / {
+        return 301 https://$host$request_uri;
+    }
+{% else %}
+    location / {
+        return 200 'Cloud-1: awaiting certificate issuance.\n';
+        add_header Content-Type text/plain;
+    }
+{% endif %}
+}
+
+{% if cert_exists | bool %}
+server {
+    listen 443 ssl;
+    server_name {{ domain_name }};
+
+    ssl_certificate     /etc/letsencrypt/live/{{ domain_name }}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/{{ domain_name }}/privkey.pem;
+
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_prefer_server_ciphers on;
+
+    root /var/www/html;
+    index index.php index.html index.htm;
+
+    location ~ ^/adminer(/.*)?$ {
+        include fastcgi_params;
+        fastcgi_pass adminer:{{ ADMINER_PORT }};
+        fastcgi_index index.php;
+        fastcgi_param SCRIPT_FILENAME /var/www/html/adminer.php;
+    }
+
+    location / {
+        try_files $uri $uri/ /index.php?$args;
+    }
+
+    location ~ \.php$ {
+        include fastcgi_params;
+        fastcgi_pass wordpress:{{ WORDPRESS_PORT }};
+        fastcgi_index index.php;
+        fastcgi_param SCRIPT_FILENAME /var/www/html$fastcgi_script_name;
+    }
+}
+{% endif %}

@@ -1,0 +1,51 @@
+---
+- name: Check if certificate already exists
+  ansible.builtin.stat:
+    path: /etc/letsencrypt/live/{{ domain_name }}/fullchain.pem
+  register: cert_stat
+
+- name: Certificate issuance
+  when: not cert_stat.stat.exists
+  block:
+    - name: Ensure ACME challenge directory exists
+      ansible.builtin.file:
+        path: /home/{{ user_login }}/data/certbot_webroot/.well-known/acme-challenge
+        state: directory
+        mode: '0755'
+        recurse: true
+
+    - name: Obtain Let's Encrypt certificate
+      ansible.builtin.command: >
+        certbot certonly
+        --webroot
+        -w /home/{{ user_login }}/data/certbot_webroot
+        --non-interactive
+        --agree-tos
+        --email {{ user_email }}
+        -d {{ domain_name }}
+        {{ '--staging' if env_mode == 'dev' else '' }}
+
+    - name: Update certificate existence fact
+      ansible.builtin.set_fact:
+        cert_exists: true
+
+    - name: Re-template nginx config with HTTPS enabled
+      ansible.builtin.template:
+        src: "{{ playbook_dir }}/roles/nginx/templates/nginx.conf.j2"
+        dest: "/root/cloud-1/srcs/requirements/nginx/tools/default.conf"
+        mode: '0644'
+
+    - name: Reload nginx to enable HTTPS
+      community.docker.docker_container_exec:
+        container: nginx
+        command: nginx -s reload
+
+- name: Configure certificate renewal cron
+  ansible.builtin.cron:
+    name: certbot-renew
+    hour: "3"
+    minute: "0"
+    job: >
+      certbot renew --quiet
+      --webroot -w /home/{{ user_login }}/data/certbot_webroot
+      --deploy-hook "docker exec nginx nginx -s reload"

@@ -1,0 +1,8 @@
+---
+- name: Clean up cloud-1 deployment
+  hosts: webservers
+  become: true
+
+  tasks:
+    - name: Import cleanup tasks
+      ansible.builtin.import_tasks: roles/setup/tasks/clean_up.yml

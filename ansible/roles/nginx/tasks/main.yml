@@ -1,0 +1,25 @@
+---
+- name: Check if TLS certificate exists
+  ansible.builtin.stat:
+    path: /etc/letsencrypt/live/{{ domain_name }}/fullchain.pem
+  register: cert_stat
+
+- name: Set certificate existence fact
+  ansible.builtin.set_fact:
+    cert_exists: "{{ cert_stat.stat.exists }}"
+
+- name: Template Nginx configuration
+  ansible.builtin.template:
+    src: nginx.conf.j2
+    dest: "/root/cloud-1/srcs/requirements/nginx/tools/default.conf"
+    mode: '0644'
+  notify: Reload nginx
+
+- name: Deploy Nginx container
+  community.docker.docker_compose_v2:
+    project_src: "/root/cloud-1/srcs"
+    state: present
+    services:
+      - nginx
+    build: policy
+    recreate: auto

@@ -1,0 +1,36 @@
+---
+# Global Variables
+user_login: "ksohail-"
+user_email: "khalilsohail24@gmail.com"
+domain_name: "ksohail.space"
+base_name: "ksohail.space"
+subdomain: "@"
+project_name: "cloud-v1"
+ssh_name: "khalil VM"
+env_mode: "dev"
+
+# Database Configuration
+MARIADB_ROOT_PASSWORD: "mr.root"
+MARIADB_USER_PASSWORD: "mr.user"
+MARIADB_USER_NAME: "user"
+MARIADB_DATABASE: "olympus"
+MARIADB_HOST: "mariadb"
+
+# WORDPRESS Configuration
+WORDPRESS_DB_PASSWORD: "mr.user"
+WORDPRESS_DB_USER: "user"
+WORDPRESS_DB_NAME: "olympus"
+WORDPRESS_DB_HOST: "mariadb"
+PHP_VERSION: "8.2"
+WP_URL: "https://{{ domain_name }}"
+WP_TITLE: "I-O-T"
+WP_ADMIN_USER: "ksohail-"
+WP_ADMIN_PASSWORD: "ksohail-"
+WP_ADMIN_EMAIL: "ksohail-@example.com"
+
+# Networking
+WORDPRESS_PORT: 9000
+NGINX_PORT: 443
+MARIADB_PORT: 3306
+ADMINER_PORT: 8080
+REDIS_PORT: 6379

@@ -1,0 +1,9 @@
+---
+- name: Deploy Redis container
+  community.docker.docker_compose_v2:
+    project_src: "/root/cloud-1/srcs"
+    state: present
+    services:
+      - redis
+    build: policy
+    recreate: auto

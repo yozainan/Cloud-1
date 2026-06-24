@@ -1,0 +1,164 @@
+---
+# ==============================================================================
+# PREREQUISITE CHECKS
+# ==============================================================================
+- name: Check prerequisites
+  tags: always
+  block:
+    - name: Check if docker is available
+      ansible.builtin.stat:
+        path: /usr/bin/docker
+      register: docker_check
+
+    - name: Check if docker-compose file exists
+      ansible.builtin.stat:
+        path: /root/cloud-1/srcs/docker-compose.yml
+      register: compose_file
+
+# ==============================================================================
+# APP CONTAINERS CLEANUP
+# ==============================================================================
+- name: MariaDB Cleanup
+  tags: mariadb
+  community.docker.docker_compose_v2:
+    project_src: /root/cloud-1/srcs
+    state: absent
+    services:
+      - mariadb
+    remove_volumes: true
+    remove_images: all
+  when: compose_file.stat.exists and docker_check.stat.exists
+
+- name: WordPress Cleanup
+  tags: wordpress
+  community.docker.docker_compose_v2:
+    project_src: /root/cloud-1/srcs
+    state: absent
+    services:
+      - wordpress
+    remove_volumes: true
+    remove_images: all
+  when: compose_file.stat.exists and docker_check.stat.exists
+
+- name: Nginx Cleanup
+  tags: nginx
+  community.docker.docker_compose_v2:
+    project_src: /root/cloud-1/srcs
+    state: absent
+    services:
+      - nginx
+    remove_volumes: true
+    remove_images: all
+  when: compose_file.stat.exists and docker_check.stat.exists
+
+- name: Redis Cleanup
+  tags: redis
+  community.docker.docker_compose_v2:
+    project_src: /root/cloud-1/srcs
+    state: absent
+    services:
+      - redis
+    remove_volumes: true
+    remove_images: all
+  when: compose_file.stat.exists and docker_check.stat.exists
+
+- name: Adminer Cleanup
+  tags: adminer
+  community.docker.docker_compose_v2:
+    project_src: /root/cloud-1/srcs
+    state: absent
+    services:
+      - adminer
+    remove_volumes: true
+    remove_images: all
+  when: compose_file.stat.exists and docker_check.stat.exists
+
+# ==============================================================================
+# CERTIFICATES CLEANUP
+# ==============================================================================
+- name: Certificates Cleanup
+  tags: certificates
+  block:
+    - name: Remove Let's Encrypt certificates
+      ansible.builtin.file:
+        path: /etc/letsencrypt
+        state: absent
+
+    - name: Remove certbot state directories
+      ansible.builtin.file:
+        path: /var/lib/certbot
+        state: absent
+
+    - name: Remove certbot renewal cron job
+      ansible.builtin.cron:
+        name: certbot-renew
+        state: absent
+
+# ==============================================================================
+# SETUP UNINSTALLATION
+# ==============================================================================
+- name: Setup Cleanup
+  tags: setup
+  block:
+    - name: Tear down entire Docker Compose stack
+      community.docker.docker_compose_v2:
+        project_src: /root/cloud-1/srcs
+        state: absent
+        remove_volumes: true
+        remove_images: all
+      when: compose_file.stat.exists and docker_check.stat.exists
+
+    - name: Prune unused Docker resources
+      community.docker.docker_prune:
+        containers: true
+        images: true
+        networks: true
+        volumes: true
+        builder_cache: true
+      when: docker_check.stat.exists
+
+    - name: Remove project source directory
+      ansible.builtin.file:
+        path: /root/cloud-1
+        state: absent
+
+    - name: Remove project data directories
+      ansible.builtin.file:
+        path: /home/{{ user_login }}/data
+        state: absent
+
+    - name: Uninstall Docker, Certbot, and base packages
+      ansible.builtin.apt:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+          - docker-buildx-plugin
+          - docker-compose-plugin
+          - python3-docker
+          - certbot
+          - curl
+          - gnupg
+          - lsb-release
+        state: absent
+        purge: true
+        autoremove: true
+
+    - name: Remove Docker repository
+      ansible.builtin.apt_repository:
+        repo: "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+        state: absent
+
+    - name: Remove Docker GPG key
+      ansible.builtin.file:
+        path: /etc/apt/keyrings/docker.asc
+        state: absent
+
+    - name: Remove lingering Docker/Containerd data directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /var/lib/docker
+        - /var/lib/containerd
+        - /etc/docker

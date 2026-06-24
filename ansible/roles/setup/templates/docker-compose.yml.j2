@@ -1,0 +1,144 @@
+services:
+  mariadb:
+    build:
+      context: ./requirements/mariadb
+      args:
+        MARIADB_PORT: {{ MARIADB_PORT }}
+    container_name: mariadb
+    restart: always
+    environment:
+      MARIADB_ROOT_PASSWORD: "{{ MARIADB_ROOT_PASSWORD }}"
+      MARIADB_USER_PASSWORD: "{{ MARIADB_USER_PASSWORD }}"
+      MARIADB_USER_NAME: "{{ MARIADB_USER_NAME }}"
+      MARIADB_DATABASE: "{{ MARIADB_DATABASE }}"
+      MARIADB_HOST: "{{ MARIADB_HOST }}"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "--socket=/run/mysqld/mysqld.sock", "-uroot", "-p{{ MARIADB_ROOT_PASSWORD }}", "ping", "--silent"]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+      start_period: 30s
+    volumes:
+      - mariadb_data:/var/lib/mysql
+    networks:
+      - website_network
+
+
+  wordpress:
+    build:
+      context: ./requirements/wordpress
+      args:
+        WORDPRESS_PORT: {{ WORDPRESS_PORT }}
+    container_name: wordpress
+    restart: always
+    depends_on:
+      mariadb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      WORDPRESS_DB_PASSWORD: "{{ WORDPRESS_DB_PASSWORD }}"
+      WORDPRESS_DB_USER: "{{ WORDPRESS_DB_USER }}"
+      WORDPRESS_DB_NAME: "{{ WORDPRESS_DB_NAME }}"
+      WORDPRESS_DB_HOST: "{{ WORDPRESS_DB_HOST }}"
+      WORDPRESS_PORT: "{{ WORDPRESS_PORT }}"
+      REDIS_PORT: "{{ REDIS_PORT }}"
+      PHP_VERSION: "{{ PHP_VERSION }}"
+      WP_URL: "{{ WP_URL }}"
+      WP_TITLE: "{{ WP_TITLE }}"
+      WP_ADMIN_USER: "{{ WP_ADMIN_USER }}"
+      WP_ADMIN_PASSWORD: "{{ WP_ADMIN_PASSWORD }}"
+      WP_ADMIN_EMAIL: "{{ WP_ADMIN_EMAIL }}"
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c '</dev/tcp/127.0.0.1/{{ WORDPRESS_PORT }}'"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - wordpress_data:/var/www/html
+    networks:
+      - website_network
+
+
+  adminer:
+    build:
+      context: ./requirements/adminer
+      args:
+        ADMINER_PORT: {{ ADMINER_PORT }}
+    container_name: adminer
+    restart: always
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c '</dev/tcp/127.0.0.1/{{ ADMINER_PORT }}'"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - website_network
+
+
+  redis:
+    build:
+      context: ./requirements/redis
+      args:
+        REDIS_PORT: {{ REDIS_PORT }}
+    container_name: redis
+    restart: always
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - website_network
+
+
+  nginx:
+    build:
+      context: ./requirements/nginx
+      args:
+        NGINX_PORT: {{ NGINX_PORT }}
+    container_name: nginx
+    restart: always
+    ports:
+      - "80:80"
+      - "{{ NGINX_PORT }}:443"
+    volumes:
+      - ./requirements/nginx/tools:/etc/nginx/conf.d:ro
+      - /home/{{ user_login }}/data/certbot_webroot:/var/www/certbot
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+      - wordpress_data:/var/www/html
+    depends_on:
+      wordpress:
+        condition: service_healthy
+      adminer:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c '</dev/tcp/127.0.0.1/80'"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - website_network
+
+
+volumes:
+  mariadb_data:
+    driver: local
+    driver_opts:
+      type: none
+      device: /home/{{ user_login }}/data/mariadb_data
+      o: bind
+
+  wordpress_data:
+    driver: local
+    driver_opts:
+      type: none
+      device: /home/{{ user_login }}/data/wordpress_data
+      o: bind
+
+networks:
+  website_network:
+    driver: bridge
